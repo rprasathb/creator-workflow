@@ -1,0 +1,96 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">C<span>.</span></span><div><strong>CreatorWorkflow</strong><small>Creator studio</small></div></div>
+    <div class="nav-heading">WORKSPACE</div>
+    <nav aria-label="Main navigation">
+      <button type="button" [class.active]="view === 'dashboard'" (click)="switchView('dashboard')"><span class="nav-icon">▦</span> Overview</button>
+      <button type="button" [class.active]="view === 'content'" (click)="switchView('content')"><span class="nav-icon">▤</span> Content library</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="signal"></span> Local workspace <small>Content planning MVP</small></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="breadcrumb">Workspace <span>/</span> {{ view === 'dashboard' ? 'Overview' : 'Content library' }}</div>
+      <div class="top-actions"><span class="local-pill"><span class="signal"></span> Single-user MVP</span><button class="btn primary" (click)="openNew()">+ New content</button></div>
+    </header>
+
+    <div class="page">
+      @if (error && !showEditor && !metricsTarget) { <div class="alert error" role="alert">{{ error }}</div> }
+      @if (notice) { <div class="alert success" role="status">{{ notice }}</div> }
+
+      @if (view === 'dashboard') {
+        <div class="heading-row"><div><div class="eyebrow">YOUR CREATOR SPACE</div><h1>Overview</h1><p>A clear view of your ideas, pipeline and published content.</p></div><button class="btn secondary" (click)="loadDashboard()">↻ Refresh</button></div>
+        @if (loading) { <div class="placeholder">Loading your dashboard…</div> }
+        @else {
+          <section class="stats" aria-label="Content statistics">
+            <div class="stat"><span>Ideas</span><strong>{{ count('IDEA') | number }}</strong><small>Ready to explore</small></div>
+            <div class="stat"><span>In progress</span><strong>{{ count('DRAFT') + count('READY') | number }}</strong><small>Drafts and ready posts</small></div>
+            <div class="stat"><span>Scheduled</span><strong>{{ count('SCHEDULED') | number }}</strong><small>Planned for publishing</small></div>
+            <div class="stat accent"><span>Total views</span><strong>{{ (summary?.totalViews ?? 0) | number }}</strong><small>Manually tracked</small></div>
+          </section>
+          <div class="panels">
+            <section class="panel"><div class="panel-top"><div><h2>Upcoming content</h2><p>What's planned next</p></div><button class="text-button" (click)="switchView('content')">View library →</button></div>
+              @if (!upcoming.length) { <div class="empty"><span class="empty-icon">▦</span><h3>Nothing scheduled yet</h3><p>Add an idea and set its planned publishing date.</p><button class="btn secondary" (click)="openNew()">Create content</button></div> }
+              @else { <div class="upcoming-list">@for (item of upcoming; track item.id) { <div class="upcoming-item"><div class="mini-icon">{{ item.platform === 'TIKTOK' ? '♪' : item.platform === 'YOUTUBE_SHORTS' ? '▶' : '◎' }}</div><div class="upcoming-copy"><strong>{{ item.title }}</strong><small>{{ platformNames[item.platform] }}</small></div><time>{{ item.scheduledAt | date:'mediumDate' }} · {{ item.scheduledAt | date:'shortTime' }}</time></div> }</div> }
+            </section>
+            <section class="panel snapshot"><div class="panel-top"><div><h2>Publishing snapshot</h2><p>Your content at a glance</p></div></div>
+              <div class="snapshot-number">{{ summary?.publishedCount ?? 0 }} <span>published posts</span></div>
+              <div class="mini-stat"><span>Total likes recorded</span><strong>{{ (summary?.totalLikes ?? 0) | number }}</strong></div>
+              <div class="mini-stat"><span>Ready to post</span><strong>{{ count('READY') }}</strong></div>
+              <div class="mini-stat"><span>Saved drafts</span><strong>{{ count('DRAFT') }}</strong></div>
+              <div class="hint">Performance numbers are entered manually for this first release.</div>
+            </section>
+          </div>
+        }
+      } @else {
+        <div class="heading-row"><div><div class="eyebrow">CONTENT MANAGEMENT</div><h1>Content library</h1><p>Every idea and published post, in one place.</p></div><span class="count-pill">{{ total }} items</span></div>
+        <section class="panel library">
+          <div class="filters">
+            <label class="search-field"><span class="sr-only">Search content</span><input [(ngModel)]="search" (keyup.enter)="applyFilters()" placeholder="Search content titles…" /></label>
+            <label><span class="sr-only">Filter by platform</span><select [(ngModel)]="platformFilter" (change)="applyFilters()"><option value="">All platforms</option>@for (platform of platforms; track platform) { <option [value]="platform">{{ platformNames[platform] }}</option> }</select></label>
+            <label><span class="sr-only">Filter by status</span><select [(ngModel)]="statusFilter" (change)="applyFilters()"><option value="">All statuses</option>@for (status of statuses; track status) { <option [value]="status">{{ statusLabel(status) | titlecase }}</option> }</select></label>
+            <button class="btn secondary" (click)="applyFilters()">Search</button>
+          </div>
+          @if (loading) { <div class="placeholder">Loading content…</div> }
+          @else if (!items.length) { <div class="empty"><span class="empty-icon">✦</span><h3>No content found</h3><p>Start with your first idea, or change your filters.</p><button class="btn primary" (click)="openNew()">+ Add content</button></div> }
+          @else {
+            <div class="table-scroll"><table><thead><tr><th>CONTENT</th><th>PLATFORM</th><th>STATUS</th><th>PLANNED DATE</th><th>ACTIONS</th></tr></thead><tbody>
+              @for (item of items; track item.id) {
+                <tr><td><div class="item-title">{{ item.title }}</div><div class="item-description">{{ item.description || 'No description' }}</div></td><td><span class="platform-dot"></span>{{ platformNames[item.platform] }}</td><td><span class="status-pill" [attr.data-status]="item.status">{{ statusLabel(item.status) }}</span></td><td>{{ item.scheduledAt ? (item.scheduledAt | date:'mediumDate') : '—' }}</td><td><div class="row-actions"><button (click)="openEdit(item)" aria-label="Edit content">Edit</button>@if (item.status === 'PUBLISHED') { <button (click)="openMetrics(item)">Metrics</button> }@if (item.status === 'ARCHIVED') { <button (click)="restoreContent(item)">Restore</button> }<button class="delete-action" (click)="deleteContent(item)">Delete</button></div></td></tr>
+              }
+            </tbody></table></div>
+            <div class="pagination"><span>Page {{ page + 1 }} of {{ totalPages }}</span><div><button [disabled]="page === 0" (click)="movePage(-1)">← Previous</button><button [disabled]="page + 1 >= totalPages" (click)="movePage(1)">Next →</button></div></div>
+          }
+        </section>
+      }
+    </div>
+  </main>
+</div>
+
+@if (showEditor) {
+  <div class="overlay" role="presentation" (click)="closeEditor()">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="editor-title" (click)="$event.stopPropagation()">
+      <div class="modal-head"><div><span class="eyebrow">CONTENT EDITOR</span><h2 id="editor-title">{{ editingId ? 'Edit content' : 'New content idea' }}</h2></div><button class="close-btn" (click)="closeEditor()" aria-label="Close">×</button></div>
+      <form (ngSubmit)="saveContent()" #contentForm="ngForm">
+        <label>Title <span class="required">*</span><input name="title" [(ngModel)]="form.title" required maxlength="160" placeholder="Give your content a name" /></label>
+        <label>Description <textarea name="description" [(ngModel)]="form.description" rows="3" placeholder="What's the hook, angle or script?"></textarea></label>
+        <div class="two-col"><label>Platform <select name="platform" [(ngModel)]="form.platform">@for (platform of platforms; track platform) { <option [value]="platform">{{ platformNames[platform] }}</option> }</select></label><label>Status <select name="status" [(ngModel)]="form.status">@for (status of statuses; track status) { <option [value]="status">{{ statusLabel(status) | titlecase }}</option> }</select></label></div>
+        @if (form.status === 'SCHEDULED' || form.scheduledAt) { <label>Planned publish date <span class="required">{{ form.status === 'SCHEDULED' ? '*' : '' }}</span><input name="scheduledAt" type="datetime-local" [(ngModel)]="form.scheduledAt" /></label> }
+        @if (form.status === 'PUBLISHED') { <label>Actual publish date <span class="required">*</span><input name="publishedAt" type="datetime-local" [(ngModel)]="form.publishedAt" /></label><label>Published URL <input name="publishedUrl" type="url" [(ngModel)]="form.publishedUrl" placeholder="https://…" /></label> }
+        @if (error) { <div class="alert error" role="alert">{{ error }}</div> }
+        <div class="modal-actions"><button type="button" class="btn secondary" (click)="closeEditor()">Cancel</button><button type="submit" class="btn primary" [disabled]="saving || contentForm.invalid">{{ saving ? 'Saving…' : editingId ? 'Save changes' : 'Create content' }}</button></div>
+      </form>
+    </section>
+  </div>
+}
+
+@if (metricsTarget) {
+  <div class="overlay" role="presentation" (click)="closeMetrics()"><section class="modal small-modal" role="dialog" aria-modal="true" aria-labelledby="metrics-title" (click)="$event.stopPropagation()">
+    <div class="modal-head"><div><span class="eyebrow">MANUAL ANALYTICS</span><h2 id="metrics-title">Record engagement</h2><p>{{ metricsTarget.title }}</p></div><button class="close-btn" (click)="closeMetrics()" aria-label="Close">×</button></div>
+    <form (ngSubmit)="saveMetrics()"><div class="two-col"><label>Views<input name="views" type="number" min="0" step="1" required [(ngModel)]="metrics.views" /></label><label>Likes<input name="likes" type="number" min="0" step="1" required [(ngModel)]="metrics.likes" /></label><label>Comments<input name="comments" type="number" min="0" step="1" required [(ngModel)]="metrics.comments" /></label><label>Shares<input name="shares" type="number" min="0" step="1" required [(ngModel)]="metrics.shares" /></label></div>
+    <p class="hint">Metrics are manually entered; platform integration is not yet available. Reopening this form starts at zero because the current API does not return previously saved metrics.</p>
+    @if (error) { <div class="alert error" role="alert">{{ error }}</div> }
+    <div class="modal-actions"><button class="btn secondary" type="button" (click)="closeMetrics()">Cancel</button><button class="btn primary" type="submit" [disabled]="saving">{{ saving ? 'Saving…' : 'Save metrics' }}</button></div></form>
+  </section></div>
+}
